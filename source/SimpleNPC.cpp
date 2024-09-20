@@ -70,6 +70,8 @@ void SimpleNPC::initNPCData(const JMapInfoIter& rIter)
 
 		if (MR::hasCsvDataItem(NpcInitData, "InitFunction", "NpcRotate"))
 			this->_EC = MR::isInitFunctionBoolSet(NpcInitData, "NpcRotate");
+		if (MR::hasCsvDataItem(NpcInitData, "InitFunction", "NpcRotateTalk"))
+			this->_ED = MR::isInitFunctionBoolSet(NpcInitData, "NpcRotateTalk");
 		if (MR::hasCsvDataItem(NpcInitData, "InitFunction", "NpcYoshiTarget"))
 			caps.mInitYoshiLockOnTarget = MR::isInitFunctionBoolSet(NpcInitData, "NpcYoshiTarget");
 	}
