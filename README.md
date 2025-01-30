@@ -82,7 +82,11 @@ Animations support the use of `ActorAnimCtrl` to define Actions (which can use m
 Binary Animation Tables (.banmt) are also supported. These are BCSV files (despite the unique extension) which allow interpolation when switching animations
 
 ### Sounds
-All non-message sounds must come from Binary Action Sound (.bas) files. SimpleNPC has no ActionSound entries right now.
+Sounds from the MSBT are supported (because of course they are)
+
+In addition, you can use a Binary Action Sound (.bas) file to play sfx based on animations.
+
+You can also add entries to `ActionSound` so long as you set the "TriggerType" to `0`, and put the name of the animation it's tied to in the "TriggerName" field.<br/>SimpleNPC has no specific UniqueName `ActionSound` entries right now, so you can name it whatever you want.
 
 ### Particle Effects
 Effects can be added to the AutoEffectList. Added effects can only be tied to animations (using the `AnimName` field), as SimpleNPC does not have any explicit particle emittors.
