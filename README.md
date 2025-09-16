@@ -16,8 +16,8 @@ Some new InitFunction values were added.
 | NpcActionTalkTurn | Data = Sets the animation name to use for Turning while Talking |
 | NpcActionSpin | Data = Sets the aniation name to use when getting spun by the player's spin attack |
 | NpcActionTrample | Data = Sets the animation name to use when getting jumped on by the player |
-| NpcActionPointing | Data = Sets the animation name to use when... (?) |
-| NpcActionReaction | Data = Sets the animation name to use when... (?) |
+| NpcActionPointing | Data = Sets the animation name to use when getting frozen by the Co-Star Luma |
+| NpcActionReaction | Data = Sets the animation name to use when being shot by a starbit |
 | NpcRotate | Data = `o` to enable NPC Rotation (default) or `x` to disable |
 | NpcRotateTalk | Data = `o` to enable NPC Rotation during talk (default) or `x` to disable |
 | NpcYoshiTarget | Data = `o` to enable Yoshi target support |
