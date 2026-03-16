@@ -13,11 +13,14 @@ public:
 	SimpleNPC(const char* pName);
 
 	virtual void init(const JMapInfoIter& rIter);
+	virtual void control();
+	virtual void calcAndSetBaseMtx();
 
 	virtual void initNPCData(const JMapInfoIter& rIter);
 	virtual void initBehaviourData(const JMapInfoIter& rIter);
 
 	TakeOutStar* mTakeOutStar;
+	ActorJointCtrl* mJointCtrl;
 };
 
 namespace NrvSimpleNPC
@@ -31,4 +34,5 @@ namespace NrvSimpleNPC
 namespace MR {
 	void getParamDataS32(s32* pDest, const JMapInfo* pCsvData, s32 ParamID, s32 Row);
 	void getParamDataF32(f32* pDest, const JMapInfo* pCsvData, s32 ParamID, s32 Row);
+	void getParamDataStrOrNULL(const char** pDest, const JMapInfo* pCsvData, s32 ParamID, s32 Row);
 }
