@@ -20,13 +20,6 @@ void SimpleNPC::init(const JMapInfoIter& rIter)
 #endif
 }
 
-extern "C"
-{
-	// I don't know how to represent MR::ActorTalkParam in the headers, so I'm doing this for now...
-	void __kAutoMap_8034B7D0(void*, const char*); // MR::ActorTalkParam::setNoTurnAction((char const *))
-	void __kAutoMap_8034CBF0(void*, const char*); // MR::ActorTalkParam::setSingleAction((char const *))
-}
-
 void trySetStrFromInitFunctionData(const char** pDest, const JMapInfo* pCsvData, const char* pDataName)
 {
 	if (MR::hasCsvDataItem(pCsvData, "InitFunction", pDataName))
@@ -75,20 +68,20 @@ void SimpleNPC::initNPCData(const JMapInfoIter& rIter)
 	if (NpcInitData != NULL)
 	{
 		// Animations
-		trySetStrFromInitFunctionData(&this->mActionWait, NpcInitData, "NpcActionWait");
-		trySetStrFromInitFunctionData(&this->mActionWaitTurn, NpcInitData, "NpcActionWaitTurn");
-		trySetStrFromInitFunctionData(&this->mActionTalk, NpcInitData, "NpcActionTalk");
-		trySetStrFromInitFunctionData(&this->mActionTalkTurn, NpcInitData, "NpcActionTalkTurn");
-		trySetStrFromInitFunctionData(&this->mActionSpinName, NpcInitData, "NpcActionSpin");
-		trySetStrFromInitFunctionData(&this->mActionTrampledName, NpcInitData, "NpcActionTrample");
-		trySetStrFromInitFunctionData(&this->mActionPointingName, NpcInitData, "NpcActionPointing");
-		trySetStrFromInitFunctionData(&this->mActionReactionName, NpcInitData, "NpcActionReaction");
-		trySetStrFromInitFunctionData(&this->mActionWalkName, NpcInitData, "NpcActionWalk");
-		trySetStrFromInitFunctionData(&this->mActionWalkTalkName, NpcInitData, "NpcActionWalkTalk");
+		trySetStrFromInitFunctionData(&mTalkParam.mActionWait, NpcInitData, "NpcActionWait");
+		trySetStrFromInitFunctionData(&mTalkParam.mActionWaitTurn, NpcInitData, "NpcActionWaitTurn");
+		trySetStrFromInitFunctionData(&mTalkParam.mActionTalk, NpcInitData, "NpcActionTalk");
+		trySetStrFromInitFunctionData(&mTalkParam.mActionTalkTurn, NpcInitData, "NpcActionTalkTurn");
+		trySetStrFromInitFunctionData(&this->mActionSpin, NpcInitData, "NpcActionSpin");
+		trySetStrFromInitFunctionData(&this->mActionTrampled, NpcInitData, "NpcActionTrample");
+		trySetStrFromInitFunctionData(&this->mActionPointing, NpcInitData, "NpcActionPointing");
+		trySetStrFromInitFunctionData(&this->mActionReaction, NpcInitData, "NpcActionReaction");
+		trySetStrFromInitFunctionData(&this->mActionWalk, NpcInitData, "NpcActionWalk");
+		trySetStrFromInitFunctionData(&this->mActionWalkTalk, NpcInitData, "NpcActionWalkTalk");
 
 		// Toggles
-		trySetBoolFromInitFunctionData(&this->mEnableTurn, NpcInitData, "NpcRotate");
-		trySetBoolFromInitFunctionData(&this->mEnableTalkTurn, NpcInitData, "NpcRotateTalk");
+		trySetBoolFromInitFunctionData(&mTalkParam.mEnableTurn, NpcInitData, "NpcRotate");
+		trySetBoolFromInitFunctionData(&mTalkParam.mEnableTalkTurn, NpcInitData, "NpcRotateTalk");
 		trySetBoolFromInitFunctionData(&caps.mInitYoshiLockOnTarget, NpcInitData, "NpcYoshiTarget");
 		trySetBoolFromInitFunctionData(&caps.mInitSearchTurtle, NpcInitData, "NpcSearchTurtle");
 		trySetBoolFromInitFunctionData(&caps.mReactSupportTicoSpin, NpcInitData, "NpcSupportTicoSpin");
@@ -99,8 +92,8 @@ void SimpleNPC::initNPCData(const JMapInfoIter& rIter)
 	if (NpcInitData != NULL)
 	{
 		trySetF32FromInitFunctionData(&this->mSpinDist, NpcInitData, "NpcSpinDist");
-		trySetF32FromInitFunctionData(&this->mTurnDist, NpcInitData, "NpcRotateDist");
-		trySetF32FromInitFunctionData(&this->mTurnSpeed, NpcInitData, "NpcRotateSpeed");
+		trySetF32FromInitFunctionData(&mTalkParam.mTurnDist, NpcInitData, "NpcRotateDist");
+		trySetF32FromInitFunctionData(&mTalkParam.mTurnSpeed, NpcInitData, "NpcRotateSpeed");
 		trySetF32FromInitFunctionData(&this->_110, NpcInitData, "NpcWalkSpeed"); // Default walk speed of the NPC
 		trySetF32FromInitFunctionData(&this->mTalkCtrl->_40, NpcInitData, "NpcTalkDist"); // This doubles as a call to MR::setDistanceToTalk() !
 
@@ -215,29 +208,31 @@ void SimpleNPC::initBehaviourData(const JMapInfoIter& rIter) {
 		if (MR::isEqualString(behaviourType, "NoTurn"))
 		{
 			if (Param00Str != NULL)
-				__kAutoMap_8034B7D0(&this->mEnableTurn, Param00Str);
+				mTalkParam.setNoTurnAction(Param00Str);
+			if (Param01Str != NULL)
+				mActionPointing = mActionReaction = mActionSpin = mActionTrampled = Param01Str;
 		}
 		else if (MR::isEqualString(behaviourType, "Single"))
 		{
 			if (Param00Str != NULL)
-				__kAutoMap_8034CBF0(&this->mEnableTurn, Param00Str);
+				mTalkParam.setSingleAction(Param00Str);
 		}
 		else if (MR::isEqualString(behaviourType, "WaitTurnWalk"))
 		{
 			if (Param00Str != NULL)
 			{
-				mActionWait = Param00Str;
-				mActionTalk = Param00Str;
+				mTalkParam.mActionWait = Param00Str;
+				mTalkParam.mActionTalk = Param00Str;
 			}
 			if (Param01Str != NULL)
 			{
-				mActionWaitTurn = Param01Str;
-				mActionTalkTurn = Param01Str;
+				mTalkParam.mActionWaitTurn = Param01Str;
+				mTalkParam.mActionTalkTurn = Param01Str;
 			}
 			if (Param02Str != NULL)
 			{
-				mActionWalkName = Param02Str;
-				mActionWalkTalkName = Param02Str;
+				mActionWalk = Param02Str;
+				mActionWalkTalk = Param02Str;
 			}
 		}
 
