@@ -18,9 +18,15 @@ public:
 
 	virtual void initNPCData(const JMapInfoIter& rIter);
 	virtual void initBehaviourData(const JMapInfoIter& rIter);
+	virtual void setBehaviour(s32 index);
 
 	TakeOutStar* mTakeOutStar;
 	ActorJointCtrl* mJointCtrl;
+	const JMapInfo* mBehaviourData;
+	s32 mRailMoveDelayTimer; // If greater than 0, the NPCs rail movement will be stopped. Decrements every frame when not talking to the NPC.
+	bool mIsDynamicJointActive;
+	bool mIsFaceJointActive;
+	bool mIsPreventReaction; // If true, this NPC will not be able to recieve reactions to players
 };
 
 namespace NrvSimpleNPC

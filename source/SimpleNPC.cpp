@@ -8,12 +8,25 @@ SimpleNPC::SimpleNPC(const char* pName) : NPCActor(pName)
 {
 	mTakeOutStar = nullptr;
 	mJointCtrl = nullptr;
+	mBehaviourData = nullptr;
+	mRailMoveDelayTimer = 0;
+	mIsDynamicJointActive = false;
+	mIsFaceJointActive = false;
+	mIsPreventReaction = false;
 }
 
 void SimpleNPC::init(const JMapInfoIter& rIter)
 {
 	initNPCData(rIter);
 	initBehaviourData(rIter);
+
+	if (MR::tryRegisterDemoCast(this, rIter))
+	{
+		s32 messageid;
+		MR::getJMapInfoMessageID(rIter, &messageid);
+		if (messageid != -2)
+			DemoFunction::registerDemoTalkMessageCtrl(this, mTalkCtrl);
+	}
 
 #ifdef GALAXY_LEVEL_ENGINE
 	GLE::registerAllGlobalFuncs(this);
@@ -95,6 +108,7 @@ void SimpleNPC::initNPCData(const JMapInfoIter& rIter)
 		trySetF32FromInitFunctionData(&mTalkParam.mTurnDist, NpcInitData, "NpcRotateDist");
 		trySetF32FromInitFunctionData(&mTalkParam.mTurnSpeed, NpcInitData, "NpcRotateSpeed");
 		trySetF32FromInitFunctionData(&this->_110, NpcInitData, "NpcWalkSpeed"); // Default walk speed of the NPC
+		trySetF32FromInitFunctionData(&this->_114, NpcInitData, "NpcWalkAccel"); // Default walk acceleration of the NPC
 		trySetF32FromInitFunctionData(&this->mTalkCtrl->_40, NpcInitData, "NpcTalkDist"); // This doubles as a call to MR::setDistanceToTalk() !
 
 		if (MR::hasCsvDataItem(NpcInitData, "InitFunction", "NpcGoods"))
@@ -165,10 +179,6 @@ void SimpleNPC::initNPCData(const JMapInfoIter& rIter)
 	}
 
 	mJointCtrl = new ActorJointCtrl(this);
-	if (mJointCtrl->mDynamicJointCtrl != nullptr)
-		mJointCtrl->startDynamicCtrl(-1);
-	if (mJointCtrl->mFaceJointCtrl != nullptr)
-		mJointCtrl->startFaceCtrl(-1);
 
 	if (MR::isConnectedWithRail(rIter))
 	{
@@ -184,67 +194,109 @@ void SimpleNPC::initBehaviourData(const JMapInfoIter& rIter) {
 	const char* mObjectName;
 	MR::getObjectName(&mObjectName, rIter);
 
-	const JMapInfo* NpcBehaviourData = MR::tryCreateCsvParser(mObjectName, "NpcBehavior.bcsv");
-	if (NpcBehaviourData != NULL)
+	mBehaviourData = MR::tryCreateCsvParser(mObjectName, "NpcBehavior.bcsv");
+	if (mBehaviourData == nullptr)
+		return;
+
+	s32 arg = -1;
+	MR::getJMapInfoArg2NoInit(rIter, &arg);
+	setBehaviour(arg);
+}
+
+void SimpleNPC::setBehaviour(s32 idx) {
+	if (mBehaviourData == nullptr)
+		return;
+
+	if (idx < 0 || idx >= MR::getCsvDataElementNum(mBehaviourData))
+		return;
+
+	const char* behaviourType;
+	MR::getCsvDataStrOrNULL(&behaviourType, mBehaviourData, "Type", idx);
+	if (behaviourType == NULL)
+		return;
+
+	const char* Param00Str;
+	const char* Param01Str;
+	const char* Param02Str;
+	MR::getParamDataStrOrNULL(&Param00Str, mBehaviourData, 0, idx);
+	MR::getParamDataStrOrNULL(&Param01Str, mBehaviourData, 1, idx);
+	MR::getParamDataStrOrNULL(&Param02Str, mBehaviourData, 2, idx);
+
+	
+	if (MR::isEqualString(behaviourType, "NoTurn"))
 	{
-		s32 arg = -1;
-		MR::getJMapInfoArg2NoInit(rIter, &arg);
-		if (arg <= -1 || arg >= MR::getCsvDataElementNum(NpcBehaviourData))
-			goto SkipBehaviour; //TODO: Once this function is done, refractor out the use of Goto...
+		if (Param00Str != NULL)
+			mTalkParam.setNoTurnAction(Param00Str);
+		if (Param01Str != NULL)
+			mActionPointing = mActionReaction = mActionSpin = mActionTrampled = Param01Str;
+	}
+	else if (MR::isEqualString(behaviourType, "Single"))
+	{
+		if (Param00Str != NULL)
+			mTalkParam.setSingleAction(Param00Str);
+	}
 
-		const char* behaviourType;
-		MR::getCsvDataStrOrNULL(&behaviourType, NpcBehaviourData, "Type", arg);
-		if (behaviourType == NULL)
-			goto SkipBehaviour;
-
-		const char* Param00Str;
-		const char* Param01Str;
-		const char* Param02Str;
-		MR::getParamDataStrOrNULL(&Param00Str, NpcBehaviourData, 0, arg);
-		MR::getParamDataStrOrNULL(&Param01Str, NpcBehaviourData, 1, arg);
-		MR::getParamDataStrOrNULL(&Param02Str, NpcBehaviourData, 2, arg);
-
-		// I would've made this a switch statement if it weren't for the fact that const char* doesn't work as a "Case" condition (because of course it doesn't...)
-		if (MR::isEqualString(behaviourType, "NoTurn"))
+	if (MR::isEqualSubString(behaviourType, "Wait"))
+	{
+		if (Param00Str != NULL)
 		{
-			if (Param00Str != NULL)
-				mTalkParam.setNoTurnAction(Param00Str);
-			if (Param01Str != NULL)
-				mActionPointing = mActionReaction = mActionSpin = mActionTrampled = Param01Str;
+			mTalkParam.mActionWait = Param00Str;
+			mTalkParam.mActionTalk = Param00Str;
 		}
-		else if (MR::isEqualString(behaviourType, "Single"))
+	}
+	if (MR::isEqualSubString(behaviourType, "Turn"))
+	{
+		if (Param01Str != NULL)
 		{
-			if (Param00Str != NULL)
-				mTalkParam.setSingleAction(Param00Str);
+			mTalkParam.mActionWaitTurn = Param01Str;
+			mTalkParam.mActionTalkTurn = Param01Str;
 		}
-		else if (MR::isEqualString(behaviourType, "WaitTurnWalk"))
+	}
+	if (MR::isEqualSubString(behaviourType, "Walk"))
+	{
+		if (Param02Str != NULL)
 		{
-			if (Param00Str != NULL)
-			{
-				mTalkParam.mActionWait = Param00Str;
-				mTalkParam.mActionTalk = Param00Str;
-			}
-			if (Param01Str != NULL)
-			{
-				mTalkParam.mActionWaitTurn = Param01Str;
-				mTalkParam.mActionTalkTurn = Param01Str;
-			}
-			if (Param02Str != NULL)
-			{
-				mActionWalk = Param02Str;
-				mActionWalkTalk = Param02Str;
-			}
+			mActionWalk = Param02Str;
+			mActionWalkTalk = Param02Str;
 		}
-
-
-		// IT'S NOT SPAGHETTI I SWEAR
-	SkipBehaviour:;
 	}
 }
 
 void SimpleNPC::control() {
-	if (mJointCtrl != nullptr) // sanity
+	if (mJointCtrl != nullptr)
+	{
+		// The radius at which the joint controls activate is the same range that is active for the NPC turning to face you
+		// that makes the most logical sense performance wise. This works regardless of if turning is enabled or not.
+		bool isInRange = MR::calcDistanceToPlayer(mTranslation) < mTalkParam.mTurnDist;
+		if (mJointCtrl->mDynamicJointCtrl != nullptr)
+		{
+			if (mIsDynamicJointActive && !isInRange)
+			{
+				mJointCtrl->endDynamicCtrl(0);
+				mIsDynamicJointActive = false;
+			}
+			else if (!mIsDynamicJointActive && isInRange)
+			{
+				mJointCtrl->startDynamicCtrl(-1);
+				mIsDynamicJointActive = true;
+			}
+		}
+		if (mJointCtrl->mFaceJointCtrl != nullptr)
+		{
+			if (mIsFaceJointActive && !isInRange)
+			{
+				mJointCtrl->endFaceCtrl(0);
+				mIsFaceJointActive = false;
+			}
+			else if (!mIsFaceJointActive && isInRange)
+			{
+				mJointCtrl->startFaceCtrl(-1);
+				mIsFaceJointActive = true;
+			}
+		}
 		mJointCtrl->update();
+	}
+
 	NPCActor::control();
 }
 
@@ -268,19 +320,54 @@ namespace NrvSimpleNPC
 
 	void NrvWait::execute(Spine* pSpine) const {
 		SimpleNPC* self = (SimpleNPC*)pSpine->mExecutor;
-		if (MR::isFirstStep(self) && !MR::isExistRail(self))
-			MR::onCalcShadowOneTime(self, nullptr);
 
-		if (MR::isExistRail(self))
+		bool hasRail = MR::isExistRail(self);
+		if (MR::isFirstStep(self) && !hasRail)
+			MR::onCalcShadowOneTime(self, nullptr);
+		s32 pointno = hasRail ? MR::getNextRailPointNo(self) : 0;
+		if (hasRail)
 		{
 			s32 v = -1;
 			MR::getCurrentRailPointArg1NoInit(self, &v);
 			if (v != -1)
 				self->_110 = static_cast<f32>(v) * 0.01f;
+
+			v = -1;
+			{ // The s32 version of getCurrentRailPointArg2NoInit is not implemented in SMG2
+				self->mRailRider->getCurrentPointArgS32WithInit("point_arg2", &v);
+			}
+			if (v != -1) {
+				self->mRailSnapToGround = v & 0x1;
+				self->mTalkParam.mEnableTurn = v & 0x2;
+				self->mIsPreventReaction = v & 0x4;
+			}
 		}
 
-		if (!MR::tryStartReactionAndPushNerve(self, self->mReactionNerve))
-			MR::tryTalkNearPlayerAndStartMoveTalkAction(self);
+		if (self->mRailMoveDelayTimer > 0)
+		{
+			self->mRailMoveDelayTimer--;
+			if (self->mIsPreventReaction || !MR::tryStartReactionAndPushNerve(self, self->mReactionNerve))
+				MR::tryTalkNearPlayerAndStartTalkAction(self);
+		}
+		else
+		{
+			if (self->mIsPreventReaction || !MR::tryStartReactionAndPushNerve(self, self->mReactionNerve))
+				MR::tryTalkNearPlayerAndStartMoveTalkAction(self);
+		}
+
+
+		s32 pointno2 = hasRail ? MR::getNextRailPointNo(self) : 0;
+		if (pointno != pointno2)
+		{
+			s32 v;
+			MR::getCurrentRailPointArg0WithInit(self, &v);
+			if (v >= 0)
+				self->setBehaviour(v);
+
+			MR::getCurrentRailPointArg3WithInit(self, &v);
+			if (v > 0)
+				self->mRailMoveDelayTimer = v;
+		}
 	}
 	NrvWait(NrvWait::sInstance);
 
