@@ -147,13 +147,8 @@ void SimpleNPC::initNPCData(const JMapInfoIter& rIter)
 				//MR::getParamDataF32(&newParam->_30, AnimScaleData, 12, 0);
 			}
 			mAnimScaleCtrl = new AnimScaleController(newParam);
-			JointControlDelegator<SimpleNPC>* jointCtrl = new JointControlDelegator<SimpleNPC>();
-			jointCtrl->mObjPtr = this;
-			jointCtrl->mCalcJointMtxFunc = &NPCActor::calcJointScale;
-			jointCtrl->mCalcJointMtxAfterChildFunc = NULL;
 
-			MR::setJointControllerParam(jointCtrl, this, pJointName);
-			mJointCtrlParam = jointCtrl;
+			mJointCtrlParam = MR::createJointDelegatorWithNullChildFunc<SimpleNPC>(this, &NPCActor::calcJointScale, pJointName); // The addition of <SimpleNPC> is required.
 		}
 	}
 
